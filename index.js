@@ -1,16 +1,24 @@
 module.exports = (robot) => {
-  robot.on('issues.opened', async context => {
-    const config = await context.config('labeler.yml', { numLabels: 20 })
-    const labels = await context.github.issues.getLabels(context.issue({ per_page: config.numLabels }))
+  robot.on(['pull_request.opened', 'pull_request.reopened'], async context => {
+    const config = await context.config('labeler.yml')
     const issue = await context.github.issues.get(context.issue())
 
-    let labelList = []
+    if (!config) return;
+
     let labelsToAdd = []
 
-    labels.data.map(label => labelList.push(label.name))
-    labelList
-      .filter(label => !config.excludeLabels.includes(label))
-      .map(label => issue.data.title.toLowerCase().includes(label) || issue.data.body.toLowerCase().includes(label) ? labelsToAdd.push(label) : null)
+    // map target branch names to labels
+    let targetLabel = config.branchMappings[context.payload.pull_request.base.ref];
+    if (targetLabel) labelsToAdd.push(targetLabel);
+
+    // map title words to labels
+    for (let k in config.titleMappings) {
+        if (context.payload.pull_request.title.toLowerCase().includes(k)
+            || context.payload.pull_request.body.toLowerCase().includes(k))
+        {
+            labelsToAdd.push(config.titleMappings[k]);
+        }
+    }
 
     return context.github.issues.addLabels(context.issue({ labels: labelsToAdd }))
   })
