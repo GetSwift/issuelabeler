@@ -20,6 +20,10 @@ module.exports = (robot) => {
         }
     }
 
+    if (context.payload.pull_request.draft) {
+        labelsToAdd.push("Draft");
+    }
+
     return context.github.issues.addLabels(context.issue({ labels: labelsToAdd }))
   })
 }
